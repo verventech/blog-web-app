@@ -7,12 +7,11 @@ from sqlmodel import SQLModel, Field, Session, create_engine, select
 DB_FILENAME = "blog_app.db"
 
 def init_db():
-    conn = sqlite3.connect(DB_FILENAME) // connect to a db file. if missing, it creates a new file
-    cursor = conn.cursor() // cursor allows python to run SQL commands in db
+    conn = sqlite3.connect(DB_FILENAME) #connect to a db file. if missing, it creates a new file
     with open("init.sql", "r") as file:
-        cursor.executescript(file.read())
-    conn.commit() // write all changes to db permanently
-    conn.close() // connection is closed
+        conn.executescript(file.read())
+    conn.commit() # write all changes to db permanently
+    conn.close() # connection is closed
 
 init_db()
 
@@ -30,6 +29,18 @@ class User(SQLModel, table=True):
     username: str = Field(unique=True, nullable=False)
     password: str = Field(nullable=False)
     email: str = Field(unique=True, nullable=False)
+
+class UserGet(SQLModel): #Only used to display a user on GET
+    id: int
+    name: str
+    username: str
+    email: str
+
+class UserPut(SQLModel):
+    name: str
+    username: str
+    password: str
+    email: str
     
 class Blog(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -42,20 +53,20 @@ app = FastAPI()
 
 @app.post("/user")
 def createUser(user: User, session: Session = Depends(get_session)):
-    session.add(user)
+    session.add(user) # Same as Insert SQL command
     session.commit()
     session.refresh(user)
     return user
 
-@app.get("/user")
+@app.get("/user", response_model=UserGet)
 def getUser(user_id: int, session: Session = Depends(get_session)):
-    user = session.get(User, user_id)
+    user = session.get(User, user_id) # Select FROM users where id = *
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-@app.put("/user")
-def editUser(user_id: int, updated_user: User, session: Session = Depends(get_session)):
+@app.put("/user", response_model=UserPut)
+def editUser(user_id: int, updated_user: UserPut, session: Session = Depends(get_session)):
     db_user = session.get(User, user_id)
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -84,6 +95,10 @@ def getBlog(blog_id: Optional[int] = None, session: Session = Depends(get_sessio
         if not blog:
             raise HTTPException(status_code=404, detail="Blog not found")
         return blog
+    return session.exec(select(Blog)).all()
+
+@app.get("/blogs")
+def getAllBlogs(session: Session = Depends(get_session)):
     return session.exec(select(Blog)).all()
 
 @app.delete("/blog")
