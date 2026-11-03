@@ -1,6 +1,10 @@
 import sqlite3
-from typing import Optional, List
+from datetime import datetime, timedelta, timezone
+from typing import Annotated, List, Optional
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 from sqlmodel import SQLModel, Field, Session, create_engine, select, func
 
 # ==============================================================================
@@ -26,14 +30,43 @@ def get_session():
 
 
 # ==============================================================================
-# 2. DATABASE MODELS (SQLModel Entities)
+# 2. SECURITY CONFIGURATION (BCRYPT & JWT)
+# ==============================================================================
+
+SECRET_KEY = "blogsecret@123" # Used to sign token.
+ALGORITHM = "HS256" #JWT Signature last part
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 # 1 hour JWT expiry
+
+pwd_context = CryptContext(schemes=["bcrypt"], bcrypt__rounds=12, deprecated="auto") 
+#Specify standard bcrypt $2b$ 
+# with  cost factor 12
+# deprecated_auto : Auto handles the deprecated versions of bcrypt
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+#dependency to inspect HTTP requests for a bearerToken in HTTP Authorization header
+
+def hash_password(password: str) -> str: #return type hint passsword: abc@123
+    return pwd_context.hash(password) # hash "1223132jwdbwjhb"
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def create_access_token(data: dict) -> str: # data ={ sub: sumaid}
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire}) # data = {sub: sumaid, exp: 32131232}
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+# ==============================================================================
+# 3. DATABASE MODELS (SQLModel Entities)
 # ==============================================================================
 
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(nullable=False)
     username: str = Field(unique=True, nullable=False)
-    password: str = Field(nullable=False)
+    hashed_password: str = Field(nullable=False)
     email: str = Field(unique=True, nullable=False)
     bio: Optional[str] = Field(default=None)
 
@@ -63,13 +96,22 @@ class UserFollow(SQLModel, table=True):
 
 
 # ==============================================================================
-# 3. REQUEST / RESPONSE SCHEMAS
+# 4. REQUEST / RESPONSE SCHEMAS
 # ==============================================================================
+
+class UserCreate(SQLModel):
+    name: str
+    username: str
+    password: str
+    email: str
+    bio: Optional[str] = None
+
 
 class UserGet(SQLModel):
     id: int
     name: str
     username: str
+    hashed_password: str
     email: str
     bio: Optional[str] = None
 
@@ -77,9 +119,14 @@ class UserGet(SQLModel):
 class UserPut(SQLModel):
     name: str
     username: str
-    password: str
+    password: Optional[str] = None
     email: str
     bio: Optional[str] = None
+
+
+class Token(SQLModel):
+    access_token: str
+    token_type: str
 
 
 class CommentCreate(SQLModel):
@@ -104,20 +151,89 @@ class BlogDetailResponse(SQLModel):
 
 
 # ==============================================================================
-# 4. FASTAPI APP & ROUTES
+# 5. AUTH DEPENDENCY
+# ==============================================================================
+
+def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Depends(get_session)) -> User:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM]) # {Sub: sumaid, expiry:323232}
+        username: Optional[str] = payload.get("sub") # sumaid
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    user = session.exec(select(User).where(User.username == username)).first()
+    if user is None:
+        raise credentials_exception
+    return user
+
+
+# ==============================================================================
+# 6. FASTAPI APP & ROUTES
 # ==============================================================================
 
 app = FastAPI(title="Blog Backend - Iteration 2")
 
 
+# ------------------------------ AUTH ROUTES ----------------------------------
+
+@app.post("/token", response_model=Token)
+def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    clean_username = form_data.username.strip().lower()
+    user = session.exec(select(User).where(func.lower(User.username) == clean_username)).first()
+
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect username or password"
+        )
+
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 # ------------------------------ USER ROUTES ----------------------------------
 
 @app.post("/user", response_model=UserGet, status_code=status.HTTP_201_CREATED)
-def createUser(user: User, session: Session = Depends(get_session)):
-    session.add(user)
+def createUser(user: UserCreate, session: Session = Depends(get_session)):
+    clean_username = user.username.strip().lower()
+    clean_email = user.email.strip().lower()
+
+    if session.exec(select(User).where(func.lower(User.username) == clean_username)).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Username already taken.."
+        )
+
+    if session.exec(select(User).where(func.lower(User.email) == clean_email)).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered.."
+        )
+
+    db_user = User(
+        name=user.name.strip(),
+        username=clean_username,
+        email=clean_email,
+        bio=user.bio,
+        hashed_password=hash_password(user.password)
+    )
+
+    session.add(db_user)
     session.commit()
-    session.refresh(user)
-    return user
+    session.refresh(db_user)
+    return db_user
+
+
+@app.get("/user/me", response_model=UserGet)
+def getMyProfile(current_user: User = Depends(get_current_user)):
+    return current_user
 
 
 @app.get("/user", response_model=UserGet)
@@ -134,11 +250,13 @@ def editUser(user_id: int, updated_user: UserPut, session: Session = Depends(get
     if not db_user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    db_user.name = updated_user.name
-    db_user.username = updated_user.username
-    db_user.email = updated_user.email
-    db_user.password = updated_user.password
+    db_user.name = updated_user.name.strip()
+    db_user.username = updated_user.username.strip().lower()
+    db_user.email = updated_user.email.strip().lower()
     db_user.bio = updated_user.bio
+
+    if updated_user.password:
+        db_user.hashed_password = hash_password(updated_user.password)
 
     session.add(db_user)
     session.commit()
@@ -161,7 +279,6 @@ def createBlog(blog: Blog, session: Session = Depends(get_session)):
 
 @app.get("/blog", response_model=BlogDetailResponse)
 def getBlog(blog_id: int, session: Session = Depends(get_session)):
-    """US-303: Fetches a single blog with calculated likes and comments count."""
     blog = session.get(Blog, blog_id)
     if not blog:
         raise HTTPException(status_code=404, detail="Blog not found")
@@ -181,7 +298,6 @@ def getBlog(blog_id: int, session: Session = Depends(get_session)):
 
 @app.get("/blogs", response_model=List[BlogDetailResponse])
 def getAllBlogs(session: Session = Depends(get_session)):
-    """US-303: Fetches all blogs, each annotated with its like and comment counts."""
     blogs = session.exec(select(Blog)).all()
     result = []
     for b in blogs:
@@ -212,7 +328,6 @@ def deleteBlog(blog_id: int, session: Session = Depends(get_session)):
 
 @app.post("/blog/{blog_id}/comment", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
 def addComment(blog_id: int, comment_data: CommentCreate, session: Session = Depends(get_session)):
-    """US-301: Add a comment to a specific blog."""
     if not session.get(Blog, blog_id):
         raise HTTPException(status_code=404, detail="Blog not found")
     if not session.get(User, comment_data.commenter_id):
@@ -231,7 +346,6 @@ def addComment(blog_id: int, comment_data: CommentCreate, session: Session = Dep
 
 @app.get("/blog/{blog_id}/comments", response_model=List[CommentResponse])
 def getBlogComments(blog_id: int, session: Session = Depends(get_session)):
-    """Fetch all comments for a blog post."""
     if not session.get(Blog, blog_id):
         raise HTTPException(status_code=404, detail="Blog not found")
     return session.exec(select(Comment).where(Comment.blog_id == blog_id)).all()
@@ -241,7 +355,6 @@ def getBlogComments(blog_id: int, session: Session = Depends(get_session)):
 
 @app.post("/blog/{blog_id}/like")
 def toggleLike(blog_id: int, user_id: int, session: Session = Depends(get_session)):
-    """US-302: Likes a post if not liked yet; unlikes if already liked (Toggle pattern)."""
     if not session.get(Blog, blog_id):
         raise HTTPException(status_code=404, detail="Blog not found")
     if not session.get(User, user_id):
@@ -263,7 +376,6 @@ def toggleLike(blog_id: int, user_id: int, session: Session = Depends(get_sessio
 
 @app.post("/user/{target_user_id}/follow")
 def followUser(target_user_id: int, current_user_id: int, session: Session = Depends(get_session)):
-    """US-304: Follow another user."""
     if target_user_id == current_user_id:
         raise HTTPException(status_code=400, detail="Users cannot follow themselves")
     if not session.get(User, target_user_id) or not session.get(User, current_user_id):
