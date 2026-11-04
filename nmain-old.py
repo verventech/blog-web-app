@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 from sqlmodel import SQLModel, Field, Session, create_engine, select, func
 
 # ==============================================================================
-# 1. DATABASE SETUP & MIGRATION SCRIPT
+# 1. DATABASE SETUP
 # ==============================================================================
 
 DB_FILENAME = "blog_app.db"
@@ -33,33 +33,28 @@ def get_session():
 # 2. SECURITY CONFIGURATION (BCRYPT & JWT)
 # ==============================================================================
 
-SECRET_KEY = "blogsecret@123" # Used to sign token.
-ALGORITHM = "HS256" #JWT Signature last part
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 # 1 hour JWT expiry
+SECRET_KEY = "your-custom-production-secret-key-change-this"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-pwd_context = CryptContext(schemes=["bcrypt"], bcrypt__rounds=12, deprecated="auto") 
-#Specify standard bcrypt $2b$ 
-# with  cost factor 12
-# deprecated_auto : Auto handles the deprecated versions of bcrypt
-
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-#dependency to inspect HTTP requests for a bearerToken in HTTP Authorization header
 
-def hash_password(password: str) -> str: #return type hint passsword: abc@123
-    return pwd_context.hash(password) # hash "1223132jwdbwjhb"
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-def create_access_token(data: dict) -> str: # data ={ sub: sumaid}
+def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire}) # data = {sub: sumaid, exp: 32131232}
+    to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 # ==============================================================================
-# 3. DATABASE MODELS (SQLModel Entities)
+# 3. DATABASE MODELS (Entities)
 # ==============================================================================
 
 class User(SQLModel, table=True):
@@ -111,7 +106,6 @@ class UserGet(SQLModel):
     id: int
     name: str
     username: str
-    hashed_password: str
     email: str
     bio: Optional[str] = None
 
@@ -129,16 +123,9 @@ class Token(SQLModel):
     token_type: str
 
 
-class CommentCreate(SQLModel):
-    text: str
-    commenter_id: int
-
-
-class CommentResponse(SQLModel):
-    id: int
-    text: str
-    commenter_id: int
-    blog_id: int
+class BlogCreate(SQLModel):
+    title: str
+    content: str
 
 
 class BlogDetailResponse(SQLModel):
@@ -148,6 +135,17 @@ class BlogDetailResponse(SQLModel):
     author_id: int
     likes_count: int
     comments_count: int
+
+
+class CommentCreate(SQLModel):
+    text: str
+
+
+class CommentResponse(SQLModel):
+    id: int
+    text: str
+    commenter_id: int
+    blog_id: int
 
 
 # ==============================================================================
@@ -161,8 +159,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM]) # {Sub: sumaid, expiry:323232}
-        username: Optional[str] = payload.get("sub") # sumaid
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: Optional[str] = payload.get("sub")
         if username is None:
             raise credentials_exception
     except JWTError:
@@ -181,7 +179,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), session: Session = Dep
 app = FastAPI(title="Blog Backend - Iteration 2")
 
 
-# ------------------------------ AUTH ROUTES ----------------------------------
+# ----------------------- AUTH & REGISTRATION (PUBLIC) -----------------------
 
 @app.post("/token", response_model=Token)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
@@ -197,8 +195,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = D
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
-
-# ------------------------------ USER ROUTES ----------------------------------
 
 @app.post("/user", response_model=UserGet, status_code=status.HTTP_201_CREATED)
 def createUser(user: UserCreate, session: Session = Depends(get_session)):
@@ -231,54 +227,78 @@ def createUser(user: UserCreate, session: Session = Depends(get_session)):
     return db_user
 
 
+# -------------------------- USER ROUTES (MIXED) ------------------------------
+
 @app.get("/user/me", response_model=UserGet)
 def getMyProfile(current_user: User = Depends(get_current_user)):
+    """🔒 Locked: Profile of the currently logged-in user."""
     return current_user
 
 
-@app.get("/user", response_model=UserGet)
+@app.put("/user/me", response_model=UserGet)
+def editCurrentUser(
+    updated_user: UserPut, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """🔒 Locked: Updates only the logged-in user's own profile."""
+    clean_username = updated_user.username.strip().lower()
+    clean_email = updated_user.email.strip().lower()
+
+    if clean_username != current_user.username:
+        if session.exec(select(User).where(func.lower(User.username) == clean_username)).first():
+            raise HTTPException(status_code=409, detail="Username already in use")
+
+    if clean_email != current_user.email:
+        if session.exec(select(User).where(func.lower(User.email) == clean_email)).first():
+            raise HTTPException(status_code=409, detail="Email already in use")
+
+    current_user.name = updated_user.name.strip()
+    current_user.username = clean_username
+    current_user.email = clean_email
+    current_user.bio = updated_user.bio
+
+    if updated_user.password:
+        current_user.hashed_password = hash_password(updated_user.password)
+
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    return current_user
+
+
+@app.get("/user/{user_id}", response_model=UserGet)
 def getUser(user_id: int, session: Session = Depends(get_session)):
+    """🔓 Public: Read any author's public profile."""
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
 
-@app.put("/user", response_model=UserGet)
-def editUser(user_id: int, updated_user: UserPut, session: Session = Depends(get_session)):
-    db_user = session.get(User, user_id)
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    db_user.name = updated_user.name.strip()
-    db_user.username = updated_user.username.strip().lower()
-    db_user.email = updated_user.email.strip().lower()
-    db_user.bio = updated_user.bio
-
-    if updated_user.password:
-        db_user.hashed_password = hash_password(updated_user.password)
-
-    session.add(db_user)
-    session.commit()
-    session.refresh(db_user)
-    return db_user
-
-
-# ------------------------------ BLOG ROUTES ----------------------------------
+# -------------------------- BLOG ROUTES (MIXED) ------------------------------
 
 @app.post("/blog", response_model=Blog, status_code=status.HTTP_201_CREATED)
-def createBlog(blog: Blog, session: Session = Depends(get_session)):
-    author = session.get(User, blog.author_id)
-    if not author:
-        raise HTTPException(status_code=404, detail="Author not found")
-    session.add(blog)
+def createBlog(
+    blog: BlogCreate, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """🔒 Locked: Author ID is automatically bound to the logged-in user."""
+    new_blog = Blog(
+        title=blog.title,
+        content=blog.content,
+        author_id=current_user.id
+    )
+    session.add(new_blog)
     session.commit()
-    session.refresh(blog)
-    return blog
+    session.refresh(new_blog)
+    return new_blog
 
 
-@app.get("/blog", response_model=BlogDetailResponse)
+@app.get("/blog/{blog_id}", response_model=BlogDetailResponse)
 def getBlog(blog_id: int, session: Session = Depends(get_session)):
+    """🔓 Public: Read any blog and its counts."""
     blog = session.get(Blog, blog_id)
     if not blog:
         raise HTTPException(status_code=404, detail="Blog not found")
@@ -298,6 +318,7 @@ def getBlog(blog_id: int, session: Session = Depends(get_session)):
 
 @app.get("/blogs", response_model=List[BlogDetailResponse])
 def getAllBlogs(session: Session = Depends(get_session)):
+    """🔓 Public: Read feed of all blogs."""
     blogs = session.exec(select(Blog)).all()
     result = []
     for b in blogs:
@@ -314,28 +335,43 @@ def getAllBlogs(session: Session = Depends(get_session)):
     return result
 
 
-@app.delete("/blog")
-def deleteBlog(blog_id: int, session: Session = Depends(get_session)):
+@app.delete("/blog/{blog_id}")
+def deleteBlog(
+    blog_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """🔒 Locked: Enforces ownership check (only author can delete)."""
     blog = session.get(Blog, blog_id)
     if not blog:
         raise HTTPException(status_code=404, detail="Blog not found")
+    if blog.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Not authorized to delete this blog post"
+        )
+
     session.delete(blog)
     session.commit()
     return {"message": "Blog and all associated comments/likes deleted successfully"}
 
 
-# ---------------------------- COMMENT ROUTES ---------------------------------
+# ------------------------ COMMENT ROUTES (MIXED) -----------------------------
 
 @app.post("/blog/{blog_id}/comment", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
-def addComment(blog_id: int, comment_data: CommentCreate, session: Session = Depends(get_session)):
+def addComment(
+    blog_id: int, 
+    comment_data: CommentCreate, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """🔒 Locked: Commenter ID is extracted from current_user."""
     if not session.get(Blog, blog_id):
         raise HTTPException(status_code=404, detail="Blog not found")
-    if not session.get(User, comment_data.commenter_id):
-        raise HTTPException(status_code=404, detail="Commenter not found")
 
     new_comment = Comment(
         text=comment_data.text,
-        commenter_id=comment_data.commenter_id,
+        commenter_id=current_user.id,
         blog_id=blog_id
     )
     session.add(new_comment)
@@ -346,48 +382,55 @@ def addComment(blog_id: int, comment_data: CommentCreate, session: Session = Dep
 
 @app.get("/blog/{blog_id}/comments", response_model=List[CommentResponse])
 def getBlogComments(blog_id: int, session: Session = Depends(get_session)):
+    """🔓 Public: Anyone can read comments."""
     if not session.get(Blog, blog_id):
         raise HTTPException(status_code=404, detail="Blog not found")
     return session.exec(select(Comment).where(Comment.blog_id == blog_id)).all()
 
 
-# ----------------------------- LIKE ROUTES -----------------------------------
+# ----------------------- LIKE & FOLLOW ROUTES (LOCKED) -----------------------
 
 @app.post("/blog/{blog_id}/like")
-def toggleLike(blog_id: int, user_id: int, session: Session = Depends(get_session)):
+def toggleLike(
+    blog_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """🔒 Locked: Uses current_user.id as liker_id."""
     if not session.get(Blog, blog_id):
         raise HTTPException(status_code=404, detail="Blog not found")
-    if not session.get(User, user_id):
-        raise HTTPException(status_code=404, detail="User not found")
 
-    existing_like = session.get(LikeTracker, (user_id, blog_id))
+    existing_like = session.get(LikeTracker, (current_user.id, blog_id))
     if existing_like:
         session.delete(existing_like)
         session.commit()
         return {"message": "Post unliked", "liked": False}
     else:
-        new_like = LikeTracker(liker_id=user_id, blog_id=blog_id)
+        new_like = LikeTracker(liker_id=current_user.id, blog_id=blog_id)
         session.add(new_like)
         session.commit()
         return {"message": "Post liked", "liked": True}
 
 
-# ---------------------------- FOLLOW ROUTES ----------------------------------
-
 @app.post("/user/{target_user_id}/follow")
-def followUser(target_user_id: int, current_user_id: int, session: Session = Depends(get_session)):
-    if target_user_id == current_user_id:
+def followUser(
+    target_user_id: int, 
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+):
+    """🔒 Locked: Uses current_user.id as follower_id."""
+    if target_user_id == current_user.id:
         raise HTTPException(status_code=400, detail="Users cannot follow themselves")
-    if not session.get(User, target_user_id) or not session.get(User, current_user_id):
-        raise HTTPException(status_code=404, detail="User not found")
+    if not session.get(User, target_user_id):
+        raise HTTPException(status_code=404, detail="Target user not found")
 
-    existing_follow = session.get(UserFollow, (current_user_id, target_user_id))
+    existing_follow = session.get(UserFollow, (current_user.id, target_user_id))
     if existing_follow:
         session.delete(existing_follow)
         session.commit()
         return {"message": f"Unfollowed user {target_user_id}", "following": False}
     else:
-        new_follow = UserFollow(follower_id=current_user_id, followed_id=target_user_id)
+        new_follow = UserFollow(follower_id=current_user.id, followed_id=target_user_id)
         session.add(new_follow)
         session.commit()
         return {"message": f"Now following user {target_user_id}", "following": True}
