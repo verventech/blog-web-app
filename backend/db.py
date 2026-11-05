@@ -1,31 +1,30 @@
-import sqlite3
+import os
 from pathlib import Path
-from sqlmodel import Session, create_engine
+from dotenv import load_dotenv
+from sqlmodel import SQLModel, Session, create_engine
 
-# Resolve path to root db/ directory: ../db/
-BASE_DIR = Path(__file__).resolve().parent.parent
-DB_DIR = BASE_DIR / "db"
-DB_FILENAME = DB_DIR / "blog_app.db"
-INIT_SQL_PATH = DB_DIR / "init.sql"
+# Load .env
+BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR.parent / ".env")
+load_dotenv(BASE_DIR / ".env")
+
+DB_USER = os.getenv("POSTGRES_USER", "postgres")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD", "postgrespassword")
+DB_HOST = os.getenv("POSTGRES_HOST", "localhost")
+DB_PORT = os.getenv("POSTGRES_PORT", "5432")
+DB_NAME = os.getenv("POSTGRES_DB", "blog_app")
+
+DATABASE_URL = (
+    f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
+
+engine = create_engine(DATABASE_URL, echo=False)
 
 
 def init_db():
-    DB_DIR.mkdir(parents=True, exist_ok=True)
-
-    conn = sqlite3.connect(DB_FILENAME)
-    conn.execute("PRAGMA foreign_keys = ON;")
-
-    with open(INIT_SQL_PATH, "r", encoding="utf-8") as file:
-        conn.executescript(file.read())
-
-    conn.commit()
-    conn.close()
-
-
-engine = create_engine(
-    f"sqlite:///{DB_FILENAME}",
-    connect_args={"check_same_thread": False},
-)
+    # Import models here so SQLModel registers every table before creating them
+    import models  # noqa: F401
+    SQLModel.metadata.create_all(engine)
 
 
 def get_session():
