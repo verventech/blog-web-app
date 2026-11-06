@@ -52,7 +52,7 @@ export default function Register() {
         <Field label="Password" icon={Lock} type="password" value={form.password} onChange={set("password")} autoComplete="new-password" required />
         <Field label="Bio (optional)" value={form.bio} onChange={set("bio")} rows={2} placeholder="A sentence about you" />
         {error && <p className="form-error">{error}</p>}
-        <button className="btn btn-primary btn-block btn-glow" disabled={busy}>
+        <button className="btn btn-primary btn-block" disabled={busy}>
           {busy ? <span className="spinner" /> : <UserPlus size={18} />} Create account
         </button>
       </form>

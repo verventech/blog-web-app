@@ -10,7 +10,7 @@ import Loader from "../components/Loader";
 import FollowButton from "../components/FollowButton";
 import Markdown from "../components/Markdown";
 import useAuthors from "../hooks/useAuthors";
-import { gradientFor, localSet, readingTime } from "../utils";
+import { localSet, readingTime } from "../utils";
 
 export default function BlogDetail() {
   const { id } = useParams();
@@ -24,7 +24,6 @@ export default function BlogDetail() {
   const [error, setError] = useState("");
   const [liked, setLiked] = useState(false);
   const [likeBusy, setLikeBusy] = useState(false);
-  const [burst, setBurst] = useState(0);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -65,7 +64,6 @@ export default function BlogDetail() {
       setLiked(res.liked);
       localSet.set("likes", user.id, blogId, res.liked);
       setBlog((b) => ({ ...b, likes_count: Math.max(0, b.likes_count + (res.liked ? 1 : -1)) }));
-      if (res.liked) setBurst((n) => n + 1);
     } catch (e) {
       toast(e.message, "error");
     } finally {
@@ -137,15 +135,11 @@ export default function BlogDetail() {
           <ArrowLeft size={16} /> All stories
         </Link>
 
-        <div className="article-cover" style={{ background: gradientFor(blog.id * 7 + blog.author_id) }}>
-          <span>{blog.title[0]?.toUpperCase()}</span>
-        </div>
-
         <h1 className="article-title">{blog.title}</h1>
 
         <div className="article-meta">
           <Link to={`/user/${blog.author_id}`} className="author-block">
-            <Avatar user={author ?? { id: blog.author_id, name: "?" }} size={46} ring />
+            <Avatar user={author ?? { id: blog.author_id, name: "?" }} size={40} />
             <div>
               <strong>{author?.name ?? "…"}</strong>
               <span>
@@ -160,35 +154,7 @@ export default function BlogDetail() {
 
         <div className="action-bar glass">
           <button className={`action like ${liked ? "liked" : ""}`} onClick={handleLike} disabled={likeBusy}>
-            <span className="like-icon">
-              <motion.span
-                key={liked ? "on" : "off"}
-                initial={{ scale: 0.4 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 500, damping: 14 }}
-                style={{ display: "inline-flex" }}
-              >
-                <Heart size={20} fill={liked ? "currentColor" : "none"} />
-              </motion.span>
-              <AnimatePresence>
-                {burst > 0 && liked && (
-                  <motion.span key={burst} className="burst" initial={{ opacity: 1 }} animate={{ opacity: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.7 }}>
-                    {Array.from({ length: 8 }).map((_, i) => (
-                      <motion.i
-                        key={i}
-                        initial={{ x: 0, y: 0, scale: 1 }}
-                        animate={{
-                          x: Math.cos((i / 8) * Math.PI * 2) * 22,
-                          y: Math.sin((i / 8) * Math.PI * 2) * 22,
-                          scale: 0,
-                        }}
-                        transition={{ duration: 0.6, ease: "easeOut" }}
-                      />
-                    ))}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </span>
+            <Heart size={18} fill={liked ? "currentColor" : "none"} />
             <span>{blog.likes_count}</span>
           </button>
           <a href="#comments" className="action">

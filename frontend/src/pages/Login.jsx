@@ -45,7 +45,7 @@ export default function Login() {
         <Field label="Username" icon={AtSign} value={form.username} onChange={set("username")} autoComplete="username" required autoFocus />
         <Field label="Password" icon={Lock} type="password" value={form.password} onChange={set("password")} autoComplete="current-password" required />
         {error && <p className="form-error">{error}</p>}
-        <button className="btn btn-primary btn-block btn-glow" disabled={busy}>
+        <button className="btn btn-primary btn-block" disabled={busy}>
           {busy ? <span className="spinner" /> : <LogIn size={18} />} Log in
         </button>
       </form>

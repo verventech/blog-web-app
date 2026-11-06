@@ -69,7 +69,7 @@ export default function Settings() {
           autoComplete="new-password"
         />
         {error && <p className="form-error">{error}</p>}
-        <button className="btn btn-primary btn-block btn-glow" disabled={busy}>
+        <button className="btn btn-primary btn-block" disabled={busy}>
           {busy ? <span className="spinner" /> : <Save size={18} />} Save changes
         </button>
       </form>

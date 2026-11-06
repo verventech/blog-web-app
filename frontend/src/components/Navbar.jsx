@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Feather, LogOut, PenSquare, Settings, User as UserIcon } from "lucide-react";
+import { LogOut, PenSquare, Settings, User as UserIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Avatar from "./Avatar";
 
@@ -34,23 +34,21 @@ export default function Navbar() {
   };
 
   return (
-    <motion.header
-      className={`nav ${scrolled ? "nav-scrolled" : ""}`}
-      initial={{ y: -40, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-    >
+    <header className={`nav ${scrolled ? "nav-scrolled" : ""}`}>
       <div className="nav-inner">
         <Link to="/" className="brand">
-          <span className="brand-mark">
-            <Feather size={18} />
+          <img src="/logo-mark.jpg" alt="" className="brand-mark" />
+          <span className="brand-lockup">
+            <span className="brand-text">Inkwell</span>
+            <span className="brand-tag">Stories worth keeping</span>
           </span>
-          <span className="brand-text">Inkwell</span>
         </Link>
+
+        <img src="/header-still.jpg" alt="" className="nav-graphic" />
 
         <nav className="nav-links">
           <NavLink to="/" end className="nav-link">
-            Explore
+            Home
           </NavLink>
           {user && (
             <NavLink to={`/user/${user.id}`} className="nav-link">
@@ -67,12 +65,12 @@ export default function Navbar() {
               </Link>
               <div className="menu-wrap" ref={menuRef}>
                 <button className="avatar-btn" onClick={() => setMenuOpen((o) => !o)} aria-label="Account menu">
-                  <Avatar user={user} size={36} ring />
+                  <Avatar user={user} size={32} />
                 </button>
                 <AnimatePresence>
                   {menuOpen && (
                     <motion.div
-                      className="menu glass"
+                      className="menu"
                       initial={{ opacity: 0, y: -8, scale: 0.96 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -8, scale: 0.96 }}
@@ -108,6 +106,6 @@ export default function Navbar() {
           )}
         </div>
       </div>
-    </motion.header>
+    </header>
   );
 }
