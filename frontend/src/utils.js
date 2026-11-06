@@ -1,18 +1,24 @@
-const GRADIENTS = [
-  ["#7c3aed", "#ec4899"],
-  ["#06b6d4", "#3b82f6"],
-  ["#f59e0b", "#ef4444"],
-  ["#10b981", "#06b6d4"],
-  ["#8b5cf6", "#06b6d4"],
-  ["#f43f5e", "#f59e0b"],
-  ["#22c55e", "#84cc16"],
-  ["#6366f1", "#a855f7"],
+const CARD_THEMES = [
+  { solid: "#1d6a8a", soft: "#d4eef7" },
+  { solid: "#2f7d4a", soft: "#d7f3e2" },
+  { solid: "#c45c12", soft: "#fde6d0" },
+  { solid: "#7a4e9a", soft: "#f0e4f8" },
+  { solid: "#c2414a", soft: "#fde4e6" },
+  { solid: "#0f766e", soft: "#d2f4ef" },
+  { solid: "#b45309", soft: "#fef0c7" },
+  { solid: "#3b5bdb", soft: "#e0e7ff" },
 ];
 
-export function gradientFor(seed = 0) {
-  const n = typeof seed === "number" ? seed : [...String(seed)].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const [a, b] = GRADIENTS[Math.abs(n) % GRADIENTS.length];
-  return `linear-gradient(135deg, ${a}, ${b})`;
+function seedNumber(seed = 0) {
+  return typeof seed === "number" ? seed : [...String(seed)].reduce((a, c) => a + c.charCodeAt(0), 0);
+}
+
+export function colorFor(seed = 0) {
+  return CARD_THEMES[Math.abs(seedNumber(seed)) % CARD_THEMES.length].solid;
+}
+
+export function cardTheme(seed = 0) {
+  return CARD_THEMES[Math.abs(seedNumber(seed)) % CARD_THEMES.length];
 }
 
 export function initials(name = "") {

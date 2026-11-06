@@ -1,15 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Heart, Mail, MessageCircle, PenSquare, Settings, BookOpen } from "lucide-react";
+import { Mail, PenSquare, Settings } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 import Avatar from "../components/Avatar";
 import BlogCard, { BlogCardSkeleton } from "../components/BlogCard";
 import FollowButton from "../components/FollowButton";
 import Loader from "../components/Loader";
-import { gradientFor } from "../utils";
-
 export default function Profile() {
   const { id } = useParams();
   const userId = Number(id);
@@ -51,13 +48,10 @@ export default function Profile() {
   const isMe = me?.id === profile.id;
 
   return (
-    <div className="page">
-      <motion.section className="profile-hero glass" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-        <div className="profile-banner" style={{ background: gradientFor(profile.id) }} />
+    <div className="page page-wide">
+      <section className="profile-hero">
         <div className="profile-main">
-          <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", delay: 0.15 }}>
-            <Avatar user={profile} size={104} ring />
-          </motion.div>
+          <Avatar user={profile} size={56} />
           <div className="profile-info">
             <h1>{profile.name}</h1>
             <p className="muted">@{profile.username}</p>
@@ -67,28 +61,28 @@ export default function Profile() {
                 <Mail size={13} /> {profile.email}
               </p>
             )}
-          </div>
-          <div className="profile-actions">
-            {isMe ? (
-              <>
-                <Link to="/settings" className="btn btn-ghost btn-sm">
-                  <Settings size={16} /> Edit profile
-                </Link>
-                <Link to="/write" className="btn btn-primary btn-sm">
-                  <PenSquare size={16} /> New story
-                </Link>
-              </>
-            ) : (
-              me && <FollowButton targetId={profile.id} />
-            )}
+            <div className="profile-actions">
+              {isMe ? (
+                <>
+                  <Link to="/settings" className="btn btn-ghost btn-sm">
+                    <Settings size={15} /> Edit profile
+                  </Link>
+                  <Link to="/write" className="btn btn-primary btn-sm">
+                    <PenSquare size={15} /> New story
+                  </Link>
+                </>
+              ) : (
+                me && <FollowButton targetId={profile.id} />
+              )}
+            </div>
           </div>
         </div>
         <div className="profile-stats">
-          <div><BookOpen size={16} /><strong>{blogs?.length ?? "–"}</strong><span>Stories</span></div>
-          <div><Heart size={16} /><strong>{stats.likes}</strong><span>Likes received</span></div>
-          <div><MessageCircle size={16} /><strong>{stats.comments}</strong><span>Responses</span></div>
+          <span><strong>{blogs?.length ?? "–"}</strong> stories</span>
+          <span><strong>{stats.likes}</strong> likes</span>
+          <span><strong>{stats.comments}</strong> responses</span>
         </div>
-      </motion.section>
+      </section>
 
       <h2 className="section-title">{isMe ? "Your stories" : `Stories by ${profile.name.split(" ")[0]}`}</h2>
 
@@ -104,7 +98,7 @@ export default function Profile() {
         </div>
       )}
 
-      <div className="grid">
+      <div className="story-list">
         {!blogs && Array.from({ length: 3 }).map((_, i) => <BlogCardSkeleton key={i} />)}
         {blogs?.map((b, i) => (
           <BlogCard key={b.id} blog={b} author={profile} index={i} />

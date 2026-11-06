@@ -1,14 +1,14 @@
-import { gradientFor, initials } from "../utils";
+import { colorFor, initials } from "../utils";
 
-export default function Avatar({ user, size = 40, ring = false }) {
+export default function Avatar({ user, size = 40 }) {
   return (
     <div
-      className={`avatar ${ring ? "avatar-ring" : ""}`}
+      className="avatar"
       style={{
         width: size,
         height: size,
-        fontSize: size * 0.4,
-        background: gradientFor(user?.id ?? user?.username ?? 0),
+        fontSize: size * 0.38,
+        background: colorFor(user?.id ?? user?.username ?? 0),
       }}
       title={user?.name}
     >

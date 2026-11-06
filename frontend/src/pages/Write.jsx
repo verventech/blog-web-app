@@ -62,7 +62,7 @@ export default function Write() {
           <button className="btn btn-ghost btn-sm" onClick={() => setPreview((p) => !p)}>
             {preview ? <PenLine size={16} /> : <Eye size={16} />} {preview ? "Edit" : "Preview"}
           </button>
-          <button className="btn btn-primary btn-sm btn-glow" onClick={publish} disabled={!canPublish || busy}>
+          <button className="btn btn-primary btn-sm" onClick={publish} disabled={!canPublish || busy}>
             {busy ? <span className="spinner" /> : <Send size={16} />} Publish
           </button>
         </div>
