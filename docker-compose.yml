@@ -38,6 +38,19 @@ services:
     networks:
       - blog_net
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: blog_frontend
+    restart: always
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend
+    networks:
+      - blog_net
+
 volumes:
   postgres_data:
 
