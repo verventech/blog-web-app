@@ -4,7 +4,6 @@ import { Search, PenSquare, RefreshCw } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 import BlogCard, { BlogCardSkeleton } from "../components/BlogCard";
-import useAuthors from "../hooks/useAuthors";
 
 const SORTS = [
   { id: "latest", label: "Latest", fn: (a, b) => b.id - a.id },
@@ -30,8 +29,6 @@ export default function Home() {
 
   useEffect(load, []);
 
-  const authors = useAuthors((blogs ?? []).map((b) => b.author_id));
-
   const visible = useMemo(() => {
     if (!blogs) return [];
     const q = query.trim().toLowerCase();
@@ -40,11 +37,11 @@ export default function Home() {
           (b) =>
             b.title.toLowerCase().includes(q) ||
             b.content.toLowerCase().includes(q) ||
-            authors[b.author_id]?.name?.toLowerCase().includes(q)
+            String(b.author_id).includes(q)
         )
       : blogs;
     return [...filtered].sort(SORTS.find((s) => s.id === sort).fn);
-  }, [blogs, query, sort, authors]);
+  }, [blogs, query, sort]);
 
   return (
     <div className="page page-wide">
@@ -96,7 +93,7 @@ export default function Home() {
       <div className="story-list">
         {!blogs && Array.from({ length: 4 }).map((_, i) => <BlogCardSkeleton key={i} />)}
         {visible.map((b) => (
-          <BlogCard key={b.id} blog={b} author={authors[b.author_id]} />
+          <BlogCard key={b.id} blog={b} />
         ))}
       </div>
     </div>

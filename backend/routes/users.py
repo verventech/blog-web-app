@@ -8,6 +8,20 @@ from security import get_current_user, hash_password
 router = APIRouter(tags=["Users"])
 
 
+def as_user_get(user: User, session: Session) -> UserGet:
+    followers_count = session.exec(
+        select(func.count(UserFollow.follower_id)).where(UserFollow.followed_id == user.id)
+    ).one()
+    return UserGet(
+        id=user.id,
+        name=user.name,
+        username=user.username,
+        email=user.email,
+        bio=user.bio,
+        followers_count=followers_count,
+    )
+
+
 @router.post("/user", response_model=UserGet, status_code=status.HTTP_201_CREATED)
 def createUser(user: UserCreate, session: Session = Depends(get_session)):
     clean_username = user.username.strip().lower()
@@ -40,12 +54,15 @@ def createUser(user: UserCreate, session: Session = Depends(get_session)):
     session.add(db_user)
     session.commit()
     session.refresh(db_user)
-    return db_user
+    return as_user_get(db_user, session)
 
 
 @router.get("/user/me", response_model=UserGet)
-def getMyProfile(current_user: User = Depends(get_current_user)):
-    return current_user
+def getMyProfile(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    return as_user_get(current_user, session)
 
 
 @router.put("/user/me", response_model=UserGet)
@@ -80,7 +97,7 @@ def editCurrentUser(
     session.add(current_user)
     session.commit()
     session.refresh(current_user)
-    return current_user
+    return as_user_get(current_user, session)
 
 
 @router.get("/user/{user_id}", response_model=UserGet)
@@ -88,7 +105,7 @@ def getUser(user_id: int, session: Session = Depends(get_session)):
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return as_user_get(user, session)
 
 
 @router.post("/user/{target_user_id}/follow")

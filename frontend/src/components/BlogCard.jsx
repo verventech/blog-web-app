@@ -1,9 +1,8 @@
 import { Link } from "react-router-dom";
 import { Clock, Heart, MessageCircle } from "lucide-react";
-import Avatar from "./Avatar";
 import { cardTheme, excerpt, readingTime } from "../utils";
 
-export default function BlogCard({ blog, author }) {
+export default function BlogCard({ blog }) {
   const theme = cardTheme(blog.id);
   return (
     <Link
@@ -22,8 +21,7 @@ export default function BlogCard({ blog, author }) {
         <p className="story-excerpt">{excerpt(blog.content, 180)}</p>
         <div className="story-foot">
           <div className="author-mini">
-            <Avatar user={author ?? { id: blog.author_id, name: "?" }} size={22} />
-            <span>{author?.name ?? "…"}</span>
+            <span>{blog.author_id}</span>
           </div>
           <div className="stats">
             <span className="stat-like">

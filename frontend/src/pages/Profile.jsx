@@ -72,13 +72,25 @@ export default function Profile() {
                   </Link>
                 </>
               ) : (
-                me && <FollowButton targetId={profile.id} />
+                me && (
+                  <FollowButton
+                    targetId={profile.id}
+                    onChange={(following) => {
+                      api.invalidateUser(profile.id);
+                      setProfile((p) => ({
+                        ...p,
+                        followers_count: Math.max(0, p.followers_count + (following ? 1 : -1)),
+                      }));
+                    }}
+                  />
+                )
               )}
             </div>
           </div>
         </div>
         <div className="profile-stats">
           <span><strong>{blogs?.length ?? "–"}</strong> stories</span>
+          <span><strong>{profile.followers_count}</strong> followers</span>
           <span><strong>{stats.likes}</strong> likes</span>
           <span><strong>{stats.comments}</strong> responses</span>
         </div>
@@ -100,8 +112,8 @@ export default function Profile() {
 
       <div className="story-list">
         {!blogs && Array.from({ length: 3 }).map((_, i) => <BlogCardSkeleton key={i} />)}
-        {blogs?.map((b, i) => (
-          <BlogCard key={b.id} blog={b} author={profile} index={i} />
+        {blogs?.map((b) => (
+          <BlogCard key={b.id} blog={b} />
         ))}
       </div>
     </div>

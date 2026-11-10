@@ -58,6 +58,7 @@ class UserGet(SQLModel):
     username: str
     email: str
     bio: Optional[str] = None
+    followers_count: int
 
 
 class UserPut(SQLModel):

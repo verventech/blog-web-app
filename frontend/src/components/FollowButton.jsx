@@ -5,7 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { localSet } from "../utils";
 
-export default function FollowButton({ targetId }) {
+export default function FollowButton({ targetId, onChange }) {
   const { user } = useAuth();
   const toast = useToast();
   const [following, setFollowing] = useState(false);
@@ -21,6 +21,7 @@ export default function FollowButton({ targetId }) {
       const res = await api.toggleFollow(targetId);
       setFollowing(res.following);
       localSet.set("follows", user.id, targetId, res.following);
+      onChange?.(res.following);
       toast(res.following ? "Following" : "Unfollowed", "success");
     } catch (e) {
       toast(e.message, "error");

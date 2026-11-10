@@ -46,7 +46,7 @@ export default function BlogDetail() {
     setLiked(localSet.has("likes", user?.id, blogId));
   }, [user, blogId]);
 
-  const people = useAuthors([...(blog ? [blog.author_id] : []), ...comments.map((c) => c.commenter_id)]);
+  const people = useAuthors(blog ? [blog.author_id] : []);
   const author = blog ? people[blog.author_id] : null;
   const isOwner = user && blog && user.id === blog.author_id;
 
@@ -191,29 +191,22 @@ export default function BlogDetail() {
 
           <ul className="comment-list">
             <AnimatePresence initial={false}>
-              {comments.map((c) => {
-                const p = people[c.commenter_id];
-                return (
-                  <motion.li
-                    key={c.id}
-                    className="comment glass"
-                    initial={{ opacity: 0, y: 12, height: 0 }}
-                    animate={{ opacity: 1, y: 0, height: "auto" }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Link to={`/user/${c.commenter_id}`}>
-                      <Avatar user={p ?? { id: c.commenter_id, name: "?" }} size={34} />
-                    </Link>
-                    <div>
-                      <div className="comment-head">
-                        <Link to={`/user/${c.commenter_id}`}>{p?.name ?? "…"}</Link>
-                        {c.commenter_id === blog.author_id && <span className="chip chip-accent">Author</span>}
-                      </div>
-                      <p>{c.text}</p>
+              {comments.map((c) => (
+                <motion.li
+                  key={c.id}
+                  className="comment glass"
+                  initial={{ opacity: 0, y: 12, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div>
+                    <div className="comment-head">
+                      <span>{c.commenter_id}</span>
                     </div>
-                  </motion.li>
-                );
-              })}
+                    <p>{c.text}</p>
+                  </div>
+                </motion.li>
+              ))}
             </AnimatePresence>
             {comments.length === 0 && <p className="muted center">No responses yet. Start the conversation.</p>}
           </ul>
