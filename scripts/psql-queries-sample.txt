@@ -1,0 +1,54 @@
+PSQL to demo JOIN on blog/{id} aggregate 
+SELECT
+    b.id,
+    b.title,
+    b.content,
+    b.author_id,
+    u.name AS author_name,
+    u.username AS author_username,
+    COALESCE(COUNT(DISTINCT l.liker_id), 0) AS likes_count,
+    COALESCE(COUNT(DISTINCT c.id), 0) AS comments_count
+FROM blog b
+JOIN "user" u ON u.id = b.author_id
+LEFT JOIN liketracker l ON l.blog_id = b.id
+LEFT JOIN comment c ON c.blog_id = b.id
+WHERE b.id = 1
+GROUP BY b.id, u.name, u.username
+LIMIT 1;
+
+
+
+Feed:
+
+SELECT 
+    b.id,
+    b.title,
+    b.author_id,
+    u.name AS author_name,
+    u.username AS author_username,
+    COALESCE(COUNT(DISTINCT lt.liker_id), 0) AS likes_count,
+    COALESCE(COUNT(DISTINCT c.id), 0) AS comments_count
+FROM blog b
+JOIN userfollow uf ON uf.followed_id = b.author_id
+JOIN "user" u ON u.id = b.author_id
+LEFT JOIN liketracker lt ON lt.blog_id = b.id
+LEFT JOIN comment c ON c.blog_id = b.id
+WHERE uf.follower_id = 1
+GROUP BY b.id, u.name, u.username
+ORDER BY b.id DESC
+LIMIT 10;
+
+
+comment:
+
+SELECT 
+    c.id,
+    c.text,
+    c.blog_id,
+    c.commenter_id,
+    u.name AS commenter_name,
+    u.username AS commenter_username
+FROM comment c
+JOIN "user" u ON u.id = c.commenter_id
+WHERE c.blog_id = 350
+ORDER BY c.id ASC;
