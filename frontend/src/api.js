@@ -78,6 +78,7 @@ export const api = {
   toggleFollow: (id) => request(`/user/${id}/follow`, { method: "POST", auth: true }),
 
   getBlogs: () => request("/blogs"),
+  getFeed: () => request("/feed", { auth: true }),
   getBlog: (id) => request(`/blog/${id}`),
   createBlog: (blog) => request("/blog", { method: "POST", body: blog, auth: true }),
   deleteBlog: (id) => request(`/blog/${id}`, { method: "DELETE", auth: true }),

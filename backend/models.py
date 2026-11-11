@@ -1,30 +1,46 @@
+#To introduce /feed and aggregated joins
 from typing import Optional
 from sqlmodel import Field, SQLModel
+
+
+# ==============================================================================
+# BASE MODELS (Shared Core Attributes)
+# ==============================================================================
+
+
+class UserBase(SQLModel):
+    name: str = Field(nullable=False)
+    username: str = Field(unique=True, index=True, nullable=False)
+    email: str = Field(unique=True, index=True, nullable=False)
+    bio: Optional[str] = Field(default=None)
+
+
+class BlogBase(SQLModel):
+    title: str = Field(nullable=False)
+    content: str = Field(nullable=False)
+
+
+class CommentBase(SQLModel):
+    text: str = Field(nullable=False)
+
 
 # ==============================================================================
 # DATABASE TABLES (Entities)
 # ==============================================================================
 
 
-class User(SQLModel, table=True):
+class User(UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(nullable=False)
-    username: str = Field(unique=True, index=True, nullable=False)
     hashed_password: str = Field(nullable=False)
-    email: str = Field(unique=True, index=True, nullable=False)
-    bio: Optional[str] = Field(default=None)
 
 
-class Blog(SQLModel, table=True):
+class Blog(BlogBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    title: str = Field(nullable=False)
-    content: str = Field(nullable=False)
     author_id: int = Field(foreign_key="user.id", nullable=False)
 
 
-class Comment(SQLModel, table=True):
+class Comment(CommentBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    text: str = Field(nullable=False)
     commenter_id: int = Field(foreign_key="user.id", nullable=False)
     blog_id: int = Field(foreign_key="blog.id", nullable=False)
 
@@ -44,29 +60,18 @@ class UserFollow(SQLModel, table=True):
 # ==============================================================================
 
 
-class UserCreate(SQLModel):
-    name: str
-    username: str
+# User Schemas
+class UserCreate(UserBase):
     password: str
-    email: str
-    bio: Optional[str] = None
 
 
-class UserGet(SQLModel):
+class UserGet(UserBase):
     id: int
-    name: str
-    username: str
-    email: str
-    bio: Optional[str] = None
-    followers_count: int
+    followers_count: int = 0
 
 
-class UserPut(SQLModel):
-    name: str
-    username: str
+class UserPut(UserBase):
     password: Optional[str] = None
-    email: str
-    bio: Optional[str] = None
 
 
 class Token(SQLModel):
@@ -74,26 +79,29 @@ class Token(SQLModel):
     token_type: str
 
 
-class BlogCreate(SQLModel):
-    title: str
-    content: str
+# Blog Schemas
+class BlogCreate(BlogBase):
+    pass
 
 
-class BlogDetailResponse(SQLModel):
+class BlogDetailResponse(BlogBase):
     id: int
-    title: str
-    content: str
     author_id: int
-    likes_count: int
-    comments_count: int
+    author_name: str
+    author_username: str
+    likes_count: int = 0
+    comments_count: int = 0
 
 
-class CommentCreate(SQLModel):
-    text: str
+# Comment Schemas
+class CommentCreate(CommentBase):
+    pass
 
 
-class CommentResponse(SQLModel):
+class CommentResponse(CommentBase):
     id: int
     text: str
-    commenter_id: int
     blog_id: int
+    commenter_id: int
+    commenter_name: str
+    commenter_username: str

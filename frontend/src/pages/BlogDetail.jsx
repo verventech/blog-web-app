@@ -9,7 +9,6 @@ import Avatar from "../components/Avatar";
 import Loader from "../components/Loader";
 import FollowButton from "../components/FollowButton";
 import Markdown from "../components/Markdown";
-import useAuthors from "../hooks/useAuthors";
 import { localSet, readingTime } from "../utils";
 
 export default function BlogDetail() {
@@ -46,8 +45,6 @@ export default function BlogDetail() {
     setLiked(localSet.has("likes", user?.id, blogId));
   }, [user, blogId]);
 
-  const people = useAuthors(blog ? [blog.author_id] : []);
-  const author = blog ? people[blog.author_id] : null;
   const isOwner = user && blog && user.id === blog.author_id;
 
   const requireLogin = () => {
@@ -139,11 +136,14 @@ export default function BlogDetail() {
 
         <div className="article-meta">
           <Link to={`/user/${blog.author_id}`} className="author-block">
-            <Avatar user={author ?? { id: blog.author_id, name: "?" }} size={40} />
+            <Avatar
+              user={{ id: blog.author_id, name: blog.author_name, username: blog.author_username }}
+              size={40}
+            />
             <div>
-              <strong>{author?.name ?? "…"}</strong>
+              <strong>{blog.author_name}</strong>
               <span>
-                @{author?.username ?? "…"} · <Clock size={12} /> {readingTime(blog.content)} min read
+                @{blog.author_username} · <Clock size={12} /> {readingTime(blog.content)} min read
               </span>
             </div>
           </Link>
@@ -199,9 +199,17 @@ export default function BlogDetail() {
                   animate={{ opacity: 1, y: 0, height: "auto" }}
                   transition={{ duration: 0.3 }}
                 >
+                  <Link to={`/user/${c.commenter_id}`}>
+                    <Avatar
+                      user={{ id: c.commenter_id, name: c.commenter_name, username: c.commenter_username }}
+                      size={34}
+                    />
+                  </Link>
                   <div>
                     <div className="comment-head">
-                      <span>{c.commenter_id}</span>
+                      <Link to={`/user/${c.commenter_id}`}>{c.commenter_name}</Link>
+                      <span className="muted">@{c.commenter_username}</span>
+                      {c.commenter_id === blog.author_id && <span className="chip chip-accent">Author</span>}
                     </div>
                     <p>{c.text}</p>
                   </div>

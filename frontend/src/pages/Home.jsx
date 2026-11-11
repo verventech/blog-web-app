@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, PenSquare, RefreshCw } from "lucide-react";
 import { api } from "../api";
@@ -12,22 +12,24 @@ const SORTS = [
 ];
 
 export default function Home() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [blogs, setBlogs] = useState(null);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("latest");
 
-  const load = () => {
+  const load = useCallback(() => {
+    if (authLoading) return;
     setError("");
     setBlogs(null);
-    api.getBlogs().then(setBlogs).catch((e) => {
+    const request = user ? api.getFeed() : api.getBlogs();
+    request.then(setBlogs).catch((e) => {
       setError(e.message);
       setBlogs([]);
     });
-  };
+  }, [authLoading, user]);
 
-  useEffect(load, []);
+  useEffect(load, [load]);
 
   const visible = useMemo(() => {
     if (!blogs) return [];
@@ -37,7 +39,8 @@ export default function Home() {
           (b) =>
             b.title.toLowerCase().includes(q) ||
             b.content.toLowerCase().includes(q) ||
-            String(b.author_id).includes(q)
+            b.author_name?.toLowerCase().includes(q) ||
+            b.author_username?.toLowerCase().includes(q)
         )
       : blogs;
     return [...filtered].sort(SORTS.find((s) => s.id === sort).fn);
@@ -46,8 +49,8 @@ export default function Home() {
   return (
     <div className="page page-wide">
       <header className="page-head">
-        <h1>Stories</h1>
-        <p>Recent writing from people on Inkwell.</p>
+        <h1>{user ? "Your feed" : "Stories"}</h1>
+        <p>{user ? "Writing from people you follow." : "Recent writing from people on Inkwell."}</p>
       </header>
 
       <div className="toolbar">
@@ -80,8 +83,14 @@ export default function Home() {
 
       {!error && blogs && visible.length === 0 && (
         <div className="empty">
-          <h3>{query ? "No matches" : "No stories yet"}</h3>
-          <p>{query ? "Try a different search." : "Nothing has been published yet."}</p>
+          <h3>{query ? "No matches" : user ? "Your feed is empty" : "No stories yet"}</h3>
+          <p>
+            {query
+              ? "Try a different search."
+              : user
+                ? "Follow writers to see their stories here."
+                : "Nothing has been published yet."}
+          </p>
           {!query && (
             <Link to={user ? "/write" : "/register"} className="btn btn-primary">
               <PenSquare size={16} /> Write a story
