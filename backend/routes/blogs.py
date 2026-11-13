@@ -24,11 +24,19 @@ def getFeed(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Fan-out on Read (Unpaginated):
-    Single query joining UserFollow, User, LikeTracker, and Comment.
-    Eliminates N+1 queries by grouping and aggregating distinct counts.
-    """
+    """Posts from accounts the current user follows."""
+    likes_count = (
+        select(func.count(LikeTracker.liker_id))
+        .where(LikeTracker.blog_id == Blog.id)
+        .correlate(Blog)
+        .scalar_subquery()
+    )
+    comments_count = (
+        select(func.count(Comment.id))
+        .where(Comment.blog_id == Blog.id)
+        .correlate(Blog)
+        .scalar_subquery()
+    )
     statement = (
         select(
             Blog.id,
@@ -37,15 +45,12 @@ def getFeed(
             Blog.author_id,
             User.name.label("author_name"),
             User.username.label("author_username"),
-            func.coalesce(func.count(func.distinct(LikeTracker.liker_id)), 0).label("likes_count"),
-            func.coalesce(func.count(func.distinct(Comment.id)), 0).label("comments_count"),
+            likes_count.label("likes_count"),
+            comments_count.label("comments_count"),
         )
         .join(UserFollow, UserFollow.followed_id == Blog.author_id)
         .join(User, User.id == Blog.author_id)
-        .outerjoin(LikeTracker, LikeTracker.blog_id == Blog.id)
-        .outerjoin(Comment, Comment.blog_id == Blog.id)
         .where(UserFollow.follower_id == current_user.id)
-        .group_by(Blog.id, User.name, User.username)
         .order_by(Blog.id.desc())
     )
     rows = session.exec(statement).all()
@@ -94,6 +99,18 @@ def createBlog(
 
 @router.get("/blog/{blog_id}", response_model=BlogDetailResponse)
 def getBlog(blog_id: int, session: Session = Depends(get_session)):
+    likes_count = (
+        select(func.count(LikeTracker.liker_id))
+        .where(LikeTracker.blog_id == Blog.id)
+        .correlate(Blog)
+        .scalar_subquery()
+    )
+    comments_count = (
+        select(func.count(Comment.id))
+        .where(Comment.blog_id == Blog.id)
+        .correlate(Blog)
+        .scalar_subquery()
+    )
     statement = (
         select(
             Blog.id,
@@ -102,14 +119,11 @@ def getBlog(blog_id: int, session: Session = Depends(get_session)):
             Blog.author_id,
             User.name.label("author_name"),
             User.username.label("author_username"),
-            func.coalesce(func.count(func.distinct(LikeTracker.liker_id)), 0).label("likes_count"),
-            func.coalesce(func.count(func.distinct(Comment.id)), 0).label("comments_count"),
+            likes_count.label("likes_count"),
+            comments_count.label("comments_count"),
         )
         .join(User, User.id == Blog.author_id)
-        .outerjoin(LikeTracker, LikeTracker.blog_id == Blog.id)
-        .outerjoin(Comment, Comment.blog_id == Blog.id)
         .where(Blog.id == blog_id)
-        .group_by(Blog.id, User.name, User.username)
     )
     row = session.exec(statement).first()
     if not row:
@@ -129,6 +143,18 @@ def getBlog(blog_id: int, session: Session = Depends(get_session)):
 
 @router.get("/blogs", response_model=List[BlogDetailResponse])
 def getAllBlogs(session: Session = Depends(get_session)):
+    likes_count = (
+        select(func.count(LikeTracker.liker_id))
+        .where(LikeTracker.blog_id == Blog.id)
+        .correlate(Blog)
+        .scalar_subquery()
+    )
+    comments_count = (
+        select(func.count(Comment.id))
+        .where(Comment.blog_id == Blog.id)
+        .correlate(Blog)
+        .scalar_subquery()
+    )
     statement = (
         select(
             Blog.id,
@@ -137,13 +163,10 @@ def getAllBlogs(session: Session = Depends(get_session)):
             Blog.author_id,
             User.name.label("author_name"),
             User.username.label("author_username"),
-            func.coalesce(func.count(func.distinct(LikeTracker.liker_id)), 0).label("likes_count"),
-            func.coalesce(func.count(func.distinct(Comment.id)), 0).label("comments_count"),
+            likes_count.label("likes_count"),
+            comments_count.label("comments_count"),
         )
         .join(User, User.id == Blog.author_id)
-        .outerjoin(LikeTracker, LikeTracker.blog_id == Blog.id)
-        .outerjoin(Comment, Comment.blog_id == Blog.id)
-        .group_by(Blog.id, User.name, User.username)
         .order_by(Blog.id.desc())
     )
     rows = session.exec(statement).all()

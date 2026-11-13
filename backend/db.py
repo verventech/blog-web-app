@@ -18,7 +18,15 @@ DATABASE_URL = (
     f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 )
 
-engine = create_engine(DATABASE_URL, echo=False)
+# Each process may hold this many connections. Three replicas stay well under
+# Postgres's connection limit. Extra requests fail in 2s instead of waiting.
+engine = create_engine(
+    DATABASE_URL,
+    echo=False,
+    pool_size=5,
+    max_overflow=5,
+    pool_timeout=2,
+)
 
 
 def init_db():
