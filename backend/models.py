@@ -1,5 +1,5 @@
 #To introduce /feed and aggregated joins
-from typing import Optional
+from typing import List, Optional
 from sqlmodel import Field, SQLModel
 
 
@@ -91,6 +91,12 @@ class BlogDetailResponse(BlogBase):
     author_username: str
     likes_count: int = 0
     comments_count: int = 0
+
+
+class BlogPageResponse(SQLModel):
+    items: List[BlogDetailResponse]
+    next_cursor: Optional[str] = None
+    has_more: bool = False
 
 
 # Comment Schemas

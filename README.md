@@ -29,9 +29,18 @@ npm run dev            # http://localhost:5173, proxies /api to http://localhost
 
 Set `VITE_BACKEND_URL` to point the dev proxy at a different backend.
 
+### Blog list pagination
+
+`GET /api/blogs` and authenticated `GET /api/feed` return pages with `items`,
+`has_more`, and `next_cursor`. The default page size is 20; `limit` can be set
+from 1 to 100. Request the next page by passing the returned cursor, for example
+`/api/blogs?limit=20&cursor=...`. `GET /api/blogs` also accepts `author_id` to
+list one writer's stories.
+
 ### Features
 
 - Explore feed with search and Latest / Popular / Discussed sorting
+- Load additional stories with cursor pagination
 - Story page with reading progress bar, likes, responses, share, and delete (author only)
 - Sign up, log in, edit profile (JWT stored in `localStorage`)
 - Distraction-free editor with live word count, preview, and auto-saved drafts

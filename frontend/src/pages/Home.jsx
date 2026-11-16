@@ -17,19 +17,45 @@ export default function Home() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("latest");
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(() => {
     if (authLoading) return;
     setError("");
     setBlogs(null);
+    setNextCursor(null);
+    setHasMore(false);
+    setLoadingMore(false);
     const request = user ? api.getFeed() : api.getBlogs();
-    request.then(setBlogs).catch((e) => {
+    request.then((page) => {
+      setBlogs(page.items);
+      setNextCursor(page.next_cursor);
+      setHasMore(page.has_more);
+    }).catch((e) => {
       setError(e.message);
       setBlogs([]);
     });
   }, [authLoading, user]);
 
   useEffect(load, [load]);
+
+  const loadMore = useCallback(() => {
+    if (!hasMore || !nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    const request = user
+      ? api.getFeed({ cursor: nextCursor })
+      : api.getBlogs({ cursor: nextCursor });
+    request.then((page) => {
+      setBlogs((current) => [...(current ?? []), ...page.items]);
+      setNextCursor(page.next_cursor);
+      setHasMore(page.has_more);
+      setError("");
+    }).catch((e) => {
+      setError(e.message);
+    }).finally(() => setLoadingMore(false));
+  }, [hasMore, loadingMore, nextCursor, user]);
 
   const visible = useMemo(() => {
     if (!blogs) return [];
@@ -83,10 +109,14 @@ export default function Home() {
 
       {!error && blogs && visible.length === 0 && (
         <div className="empty">
-          <h3>{query ? "No matches" : user ? "Your feed is empty" : "No stories yet"}</h3>
+          <h3>
+            {query
+              ? (hasMore ? "No matches on this page" : "No matches")
+              : user ? "Your feed is empty" : "No stories yet"}
+          </h3>
           <p>
             {query
-              ? "Try a different search."
+              ? (hasMore ? "Load more stories to continue searching." : "Try a different search.")
               : user
                 ? "Follow writers to see their stories here."
                 : "Nothing has been published yet."}
@@ -105,6 +135,13 @@ export default function Home() {
           <BlogCard key={b.id} blog={b} />
         ))}
       </div>
+      {hasMore && (
+        <div className="center" style={{ marginTop: 24 }}>
+          <button className="btn btn-ghost" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? "Loading..." : "Load more stories"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

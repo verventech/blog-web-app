@@ -7,6 +7,18 @@ import Avatar from "../components/Avatar";
 import BlogCard, { BlogCardSkeleton } from "../components/BlogCard";
 import FollowButton from "../components/FollowButton";
 import Loader from "../components/Loader";
+
+async function loadAuthorBlogs(authorId) {
+  const blogs = [];
+  let cursor;
+  do {
+    const page = await api.getBlogs({ authorId, cursor });
+    blogs.push(...page.items);
+    cursor = page.next_cursor;
+  } while (cursor);
+  return blogs;
+}
+
 export default function Profile() {
   const { id } = useParams();
   const userId = Number(id);
@@ -20,9 +32,8 @@ export default function Profile() {
     setBlogs(null);
     setError("");
     api.getUser(userId).then(setProfile).catch((e) => setError(e.message));
-    api
-      .getBlogs()
-      .then((all) => setBlogs(all.filter((b) => b.author_id === userId).sort((a, b) => b.id - a.id)))
+    loadAuthorBlogs(userId)
+      .then((authorBlogs) => setBlogs(authorBlogs.sort((a, b) => b.id - a.id)))
       .catch(() => setBlogs([]));
   }, [userId]);
 

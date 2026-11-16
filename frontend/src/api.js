@@ -55,6 +55,13 @@ async function request(path, { method = "GET", body, form, auth = false } = {}) 
   return data;
 }
 
+function paginationQuery({ cursor, limit = 20, authorId } = {}) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor != null) params.set("cursor", cursor);
+  if (authorId != null) params.set("author_id", String(authorId));
+  return `?${params.toString()}`;
+}
+
 const userCache = new Map();
 
 export const api = {
@@ -77,8 +84,8 @@ export const api = {
   invalidateUser: (id) => userCache.delete(id),
   toggleFollow: (id) => request(`/user/${id}/follow`, { method: "POST", auth: true }),
 
-  getBlogs: () => request("/blogs"),
-  getFeed: () => request("/feed", { auth: true }),
+  getBlogs: (params) => request(`/blogs${paginationQuery(params)}`),
+  getFeed: (params) => request(`/feed${paginationQuery(params)}`, { auth: true }),
   getBlog: (id) => request(`/blog/${id}`),
   createBlog: (blog) => request("/blog", { method: "POST", body: blog, auth: true }),
   deleteBlog: (id) => request(`/blog/${id}`, { method: "DELETE", auth: true }),

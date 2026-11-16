@@ -1,5 +1,8 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+import base64
+import binascii
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, func, select
 
 from db import get_session
@@ -7,6 +10,7 @@ from models import (
     Blog,
     BlogCreate,
     BlogDetailResponse,
+    BlogPageResponse,
     Comment,
     CommentCreate,
     CommentResponse,
@@ -19,12 +23,7 @@ from security import get_current_user
 router = APIRouter(tags=["Blogs & Comments"])
 
 
-@router.get("/feed", response_model=List[BlogDetailResponse])
-def getFeed(
-    session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-):
-    """Posts from accounts the current user follows."""
+def _blog_select_statement():
     likes_count = (
         select(func.count(LikeTracker.liker_id))
         .where(LikeTracker.blog_id == Blog.id)
@@ -37,7 +36,7 @@ def getFeed(
         .correlate(Blog)
         .scalar_subquery()
     )
-    statement = (
+    return (
         select(
             Blog.id,
             Blog.title,
@@ -48,26 +47,82 @@ def getFeed(
             likes_count.label("likes_count"),
             comments_count.label("comments_count"),
         )
-        .join(UserFollow, UserFollow.followed_id == Blog.author_id)
         .join(User, User.id == Blog.author_id)
-        .where(UserFollow.follower_id == current_user.id)
-        .order_by(Blog.id.desc())
     )
-    rows = session.exec(statement).all()
 
-    return [
-        BlogDetailResponse(
-            id=r[0],
-            title=r[1],
-            content=r[2],
-            author_id=r[3],
-            author_name=r[4],
-            author_username=r[5],
-            likes_count=r[6],
-            comments_count=r[7],
-        )
-        for r in rows
-    ]
+
+def _encode_cursor(blog_id: int) -> str:
+    encoded = base64.urlsafe_b64encode(str(blog_id).encode("ascii"))
+    return encoded.decode("ascii").rstrip("=")
+
+
+def _decode_cursor(cursor: Optional[str]) -> Optional[int]:
+    if cursor is None:
+        return None
+
+    try:
+        decoded = base64.b64decode(
+            cursor + "=" * (-len(cursor) % 4),
+            altchars=b"-_",
+            validate=True,
+        ).decode("ascii")
+        blog_id = int(decoded)
+    except (binascii.Error, UnicodeDecodeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid cursor")
+
+    if blog_id < 1 or str(blog_id) != decoded or _encode_cursor(blog_id) != cursor:
+        raise HTTPException(status_code=400, detail="Invalid cursor")
+    return blog_id
+
+
+def _blog_response(row) -> BlogDetailResponse:
+    return BlogDetailResponse(
+        id=row[0],
+        title=row[1],
+        content=row[2],
+        author_id=row[3],
+        author_name=row[4],
+        author_username=row[5],
+        likes_count=row[6],
+        comments_count=row[7],
+    )
+
+
+def _get_blog_page(
+    session: Session,
+    statement,
+    limit: int,
+    cursor: Optional[str],
+) -> BlogPageResponse:
+    cursor_id = _decode_cursor(cursor)
+    if cursor_id is not None:
+        statement = statement.where(Blog.id < cursor_id)
+
+    rows = session.exec(statement.order_by(Blog.id.desc()).limit(limit + 1)).all()
+    has_more = len(rows) > limit
+    items = [_blog_response(row) for row in rows[:limit]]
+
+    return BlogPageResponse(
+        items=items,
+        next_cursor=_encode_cursor(items[-1].id) if has_more else None,
+        has_more=has_more,
+    )
+
+
+@router.get("/feed", response_model=BlogPageResponse)
+def getFeed(
+    cursor: Optional[str] = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Posts from accounts the current user follows."""
+    statement = (
+        _blog_select_statement()
+        .join(UserFollow, UserFollow.followed_id == Blog.author_id)
+        .where(UserFollow.follower_id == current_user.id)
+    )
+    return _get_blog_page(session, statement, limit, cursor)
 
 
 @router.post("/blog", response_model=BlogDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -141,49 +196,17 @@ def getBlog(blog_id: int, session: Session = Depends(get_session)):
     )
 
 
-@router.get("/blogs", response_model=List[BlogDetailResponse])
-def getAllBlogs(session: Session = Depends(get_session)):
-    likes_count = (
-        select(func.count(LikeTracker.liker_id))
-        .where(LikeTracker.blog_id == Blog.id)
-        .correlate(Blog)
-        .scalar_subquery()
-    )
-    comments_count = (
-        select(func.count(Comment.id))
-        .where(Comment.blog_id == Blog.id)
-        .correlate(Blog)
-        .scalar_subquery()
-    )
-    statement = (
-        select(
-            Blog.id,
-            Blog.title,
-            Blog.content,
-            Blog.author_id,
-            User.name.label("author_name"),
-            User.username.label("author_username"),
-            likes_count.label("likes_count"),
-            comments_count.label("comments_count"),
-        )
-        .join(User, User.id == Blog.author_id)
-        .order_by(Blog.id.desc())
-    )
-    rows = session.exec(statement).all()
-
-    return [
-        BlogDetailResponse(
-            id=r[0],
-            title=r[1],
-            content=r[2],
-            author_id=r[3],
-            author_name=r[4],
-            author_username=r[5],
-            likes_count=r[6],
-            comments_count=r[7],
-        )
-        for r in rows
-    ]
+@router.get("/blogs", response_model=BlogPageResponse)
+def getAllBlogs(
+    cursor: Optional[str] = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    author_id: Optional[int] = Query(default=None, ge=1),
+    session: Session = Depends(get_session),
+):
+    statement = _blog_select_statement()
+    if author_id is not None:
+        statement = statement.where(Blog.author_id == author_id)
+    return _get_blog_page(session, statement, limit, cursor)
 
 
 @router.delete("/blog/{blog_id}")
