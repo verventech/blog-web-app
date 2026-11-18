@@ -22,6 +22,7 @@ services:
       - blog_net
 
   backend:
+    image: ${DOCKER_USER:-verventech}/blog-web-app-backend:${TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -37,6 +38,7 @@ services:
       - blog_net
 
   frontend:
+    image: ${DOCKER_USER:-verventech}/blog-web-app-frontend:${TAG:-latest}
     build:
       context: ./frontend
       dockerfile: Dockerfile

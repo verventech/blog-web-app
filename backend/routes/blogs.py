@@ -11,9 +11,11 @@ from models import (
     BlogCreate,
     BlogDetailResponse,
     BlogPageResponse,
+    BlogUpdate,
     Comment,
     CommentCreate,
     CommentResponse,
+    CommentUpdate,
     LikeTracker,
     User,
     UserFollow,
@@ -152,6 +154,36 @@ def createBlog(
     )
 
 
+@router.patch("/blog/{blog_id}", response_model=BlogDetailResponse)
+def updateBlog(
+    blog_id: int,
+    blog_data: BlogUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    blog = session.get(Blog, blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
+    if blog.author_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to edit this blog post",
+        )
+
+    title = blog_data.title.strip()
+    content = blog_data.content.strip()
+    if not title or not content:
+        raise HTTPException(status_code=422, detail="Title and content cannot be empty")
+
+    blog.title = title
+    blog.content = content
+    session.add(blog)
+    session.commit()
+
+    row = session.exec(_blog_select_statement().where(Blog.id == blog_id)).first()
+    return _blog_response(row)
+
+
 @router.get("/blog/{blog_id}", response_model=BlogDetailResponse)
 def getBlog(blog_id: int, session: Session = Depends(get_session)):
     likes_count = (
@@ -257,6 +289,45 @@ def addComment(
         text=new_comment.text,
         blog_id=new_comment.blog_id,
         commenter_id=new_comment.commenter_id,
+        commenter_name=current_user.name,
+        commenter_username=current_user.username,
+    )
+
+
+@router.patch(
+    "/blog/{blog_id}/comment/{comment_id}",
+    response_model=CommentResponse,
+)
+def updateComment(
+    blog_id: int,
+    comment_id: int,
+    comment_data: CommentUpdate,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    comment = session.get(Comment, comment_id)
+    if not comment or comment.blog_id != blog_id:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    if comment.commenter_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to edit this comment",
+        )
+
+    text = comment_data.text.strip()
+    if not text:
+        raise HTTPException(status_code=422, detail="Comment cannot be empty")
+
+    comment.text = text
+    session.add(comment)
+    session.commit()
+    session.refresh(comment)
+
+    return CommentResponse(
+        id=comment.id,
+        text=comment.text,
+        blog_id=comment.blog_id,
+        commenter_id=comment.commenter_id,
         commenter_name=current_user.name,
         commenter_username=current_user.username,
     )

@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 
-from db import init_db
+from db import engine, init_db
 from routes import auth, blogs, users
 
 # Run the SQL migration script on app startup
@@ -25,3 +26,10 @@ async def pool_exhausted(_request: Request, _exc: PoolTimeout):
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(blogs.router)
+
+
+@app.get("/health")
+def health():
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    return {"status": "ok"}

@@ -1,28 +1,58 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Eye, PenLine, Send } from "lucide-react";
+import { ArrowLeft, Eye, PenLine, Send } from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import Avatar from "../components/Avatar";
+import Loader from "../components/Loader";
 import Markdown from "../components/Markdown";
 import { readingTime } from "../utils";
 
 const DRAFT_KEY = "inkwell_draft";
 
 export default function Write() {
+  const { id } = useParams();
+  const editing = Boolean(id);
+  const blogId = Number(id);
   const { user } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
-  const [draft, setDraft] = useState(() => JSON.parse(localStorage.getItem(DRAFT_KEY) || '{"title":"","content":""}'));
+  const [draft, setDraft] = useState(() =>
+    editing ? { title: "", content: "" } : JSON.parse(localStorage.getItem(DRAFT_KEY) || '{"title":"","content":""}')
+  );
+  const [editLoaded, setEditLoaded] = useState(!editing);
   const [preview, setPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const contentRef = useRef(null);
 
   useEffect(() => {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-  }, [draft]);
+    if (!editing) localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }, [draft, editing]);
+
+  useEffect(() => {
+    if (!editing) return;
+    let active = true;
+    setEditLoaded(false);
+    api.getBlog(blogId).then((blog) => {
+      if (!active) return;
+      if (blog.author_id !== user?.id) {
+        toast("You can only edit your own story", "error");
+        navigate(`/blog/${blogId}`, { replace: true });
+        return;
+      }
+      setDraft({ title: blog.title, content: blog.content });
+      setEditLoaded(true);
+    }).catch((e) => {
+      if (!active) return;
+      toast(e.message, "error");
+      navigate("/", { replace: true });
+    });
+    return () => {
+      active = false;
+    };
+  }, [blogId, editing, navigate, toast, user?.id]);
 
   useEffect(() => {
     const el = contentRef.current;
@@ -35,12 +65,15 @@ export default function Write() {
   const canPublish = draft.title.trim() && draft.content.trim();
 
   const publish = async () => {
-    if (!canPublish) return;
+    if (!canPublish || !editLoaded) return;
     setBusy(true);
     try {
-      const blog = await api.createBlog({ title: draft.title.trim(), content: draft.content.trim() });
-      localStorage.removeItem(DRAFT_KEY);
-      toast("Your story is live!", "success");
+      const content = { title: draft.title.trim(), content: draft.content.trim() };
+      const blog = editing
+        ? await api.updateBlog(blogId, content)
+        : await api.createBlog(content);
+      if (!editing) localStorage.removeItem(DRAFT_KEY);
+      toast(editing ? "Story updated" : "Your story is live!", "success");
       navigate(`/blog/${blog.id}`);
     } catch (e) {
       toast(e.message, "error");
@@ -49,21 +82,28 @@ export default function Write() {
     }
   };
 
+  if (!editLoaded) return <Loader label="Loading story" />;
+
   return (
     <div className="page narrow">
       <motion.div className="editor-bar glass" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <div className="author-mini">
           <Avatar user={user} size={30} />
           <span>
-            Draft · <span className="muted">{words} words · {readingTime(draft.content)} min read</span>
+            {editing ? "Editing story" : "Draft"} · <span className="muted">{words} words · {readingTime(draft.content)} min read</span>
           </span>
         </div>
         <div className="editor-actions">
+          {editing && (
+            <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/blog/${blogId}`)}>
+              <ArrowLeft size={16} /> Cancel
+            </button>
+          )}
           <button className="btn btn-ghost btn-sm" onClick={() => setPreview((p) => !p)}>
             {preview ? <PenLine size={16} /> : <Eye size={16} />} {preview ? "Edit" : "Preview"}
           </button>
           <button className="btn btn-primary btn-sm" onClick={publish} disabled={!canPublish || busy}>
-            {busy ? <span className="spinner" /> : <Send size={16} />} Publish
+            {busy ? <span className="spinner" /> : <Send size={16} />} {editing ? "Save changes" : "Publish"}
           </button>
         </div>
       </motion.div>

@@ -88,9 +88,17 @@ export const api = {
   getFeed: (params) => request(`/feed${paginationQuery(params)}`, { auth: true }),
   getBlog: (id) => request(`/blog/${id}`),
   createBlog: (blog) => request("/blog", { method: "POST", body: blog, auth: true }),
+  updateBlog: (id, blog) =>
+    request(`/blog/${id}`, { method: "PATCH", body: blog, auth: true }),
   deleteBlog: (id) => request(`/blog/${id}`, { method: "DELETE", auth: true }),
   toggleLike: (id) => request(`/blog/${id}/like`, { method: "POST", auth: true }),
   getComments: (id) => request(`/blog/${id}/comments`),
   addComment: (id, text) =>
     request(`/blog/${id}/comment`, { method: "POST", body: { text }, auth: true }),
+  updateComment: (blogId, commentId, text) =>
+    request(`/blog/${blogId}/comment/${commentId}`, {
+      method: "PATCH",
+      body: { text },
+      auth: true,
+    }),
 };

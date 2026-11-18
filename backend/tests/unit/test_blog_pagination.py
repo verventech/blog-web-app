@@ -2,10 +2,10 @@ import unittest
 
 from fastapi import HTTPException
 from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, Session, create_engine
+from sqlmodel import Session, SQLModel, create_engine
 
-from models import Blog, User, UserFollow
-from routes.blogs import getAllBlogs, getFeed
+from models import Blog, BlogUpdate, Comment, CommentUpdate, User, UserFollow
+from routes.blogs import getAllBlogs, getFeed, updateBlog, updateComment
 
 
 class BlogPaginationTests(unittest.TestCase):
@@ -122,6 +122,67 @@ class BlogPaginationTests(unittest.TestCase):
             )
 
         self.assertEqual(context.exception.status_code, 400)
+
+    def test_blog_owner_can_edit_and_other_users_cannot(self):
+        blog = self.blogs[0]
+        updated = updateBlog(
+            blog_id=blog.id,
+            blog_data=BlogUpdate(title="  Updated title  ", content=" Updated body "),
+            session=self.session,
+            current_user=self.followed,
+        )
+
+        self.assertEqual(updated.title, "Updated title")
+        self.assertEqual(updated.content, "Updated body")
+
+        with self.assertRaises(HTTPException) as context:
+            updateBlog(
+                blog_id=blog.id,
+                blog_data=BlogUpdate(title="Not yours", content="No access"),
+                session=self.session,
+                current_user=self.other,
+            )
+        self.assertEqual(context.exception.status_code, 403)
+
+    def test_comment_owner_can_edit_but_other_users_cannot(self):
+        blog = self.blogs[0]
+        comment = Comment(
+            text="Original response",
+            commenter_id=self.viewer.id,
+            blog_id=blog.id,
+        )
+        self.session.add(comment)
+        self.session.commit()
+        self.session.refresh(comment)
+
+        updated = updateComment(
+            blog_id=blog.id,
+            comment_id=comment.id,
+            comment_data=CommentUpdate(text="  Updated response  "),
+            session=self.session,
+            current_user=self.viewer,
+        )
+        self.assertEqual(updated.text, "Updated response")
+
+        with self.assertRaises(HTTPException) as context:
+            updateComment(
+                blog_id=blog.id,
+                comment_id=comment.id,
+                comment_data=CommentUpdate(text="Not yours"),
+                session=self.session,
+                current_user=self.other,
+            )
+        self.assertEqual(context.exception.status_code, 403)
+
+        with self.assertRaises(HTTPException) as context:
+            updateComment(
+                blog_id=self.blogs[1].id,
+                comment_id=comment.id,
+                comment_data=CommentUpdate(text="Wrong blog"),
+                session=self.session,
+                current_user=self.viewer,
+            )
+        self.assertEqual(context.exception.status_code, 404)
 
 
 if __name__ == "__main__":

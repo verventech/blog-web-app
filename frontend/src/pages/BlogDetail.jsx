@@ -1,7 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion, useScroll, useSpring } from "framer-motion";
-import { ArrowLeft, Clock, Heart, MessageCircle, Send, Share2, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  Clock,
+  Heart,
+  MessageCircle,
+  Pencil,
+  Send,
+  Share2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -25,6 +36,9 @@ export default function BlogDetail() {
   const [likeBusy, setLikeBusy] = useState(false);
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
+  const [savingCommentId, setSavingCommentId] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { scrollYProgress } = useScroll();
@@ -85,6 +99,28 @@ export default function BlogDetail() {
     }
   };
 
+  const handleEditComment = async (e, commentId) => {
+    e.preventDefault();
+    if (!editingCommentText.trim() || savingCommentId !== null) return;
+    setSavingCommentId(commentId);
+    try {
+      const updated = await api.updateComment(blogId, commentId, editingCommentText.trim());
+      setComments((current) => current.map((comment) => comment.id === commentId ? updated : comment));
+      setEditingCommentId(null);
+      setEditingCommentText("");
+      toast("Response updated", "success");
+    } catch (e) {
+      toast(e.message, "error");
+    } finally {
+      setSavingCommentId(null);
+    }
+  };
+
+  const startEditingComment = (comment) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.text);
+  };
+
   const handleDelete = async () => {
     try {
       await api.deleteBlog(blogId);
@@ -133,6 +169,11 @@ export default function BlogDetail() {
         </Link>
 
         <h1 className="article-title">{blog.title}</h1>
+        {isOwner && (
+          <Link to={`/blog/${blogId}/edit`} className="btn btn-ghost btn-sm">
+            <Pencil size={15} /> Edit story
+          </Link>
+        )}
 
         <div className="article-meta">
           <Link to={`/user/${blog.author_id}`} className="author-block">
@@ -211,7 +252,48 @@ export default function BlogDetail() {
                       <span className="muted">@{c.commenter_username}</span>
                       {c.commenter_id === blog.author_id && <span className="chip chip-accent">Author</span>}
                     </div>
-                    <p>{c.text}</p>
+                    {editingCommentId === c.id ? (
+                      <form onSubmit={(e) => handleEditComment(e, c.id)}>
+                        <textarea
+                          className="comment-edit-input"
+                          value={editingCommentText}
+                          onChange={(e) => setEditingCommentText(e.target.value)}
+                          rows={3}
+                          autoFocus
+                        />
+                        <div className="comment-edit-actions">
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => {
+                              setEditingCommentId(null);
+                              setEditingCommentText("");
+                            }}
+                            disabled={savingCommentId === c.id}
+                          >
+                            <X size={14} /> Cancel
+                          </button>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            disabled={!editingCommentText.trim() || savingCommentId === c.id}
+                          >
+                            <Check size={14} /> Save
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <>
+                        <p>{c.text}</p>
+                        {user?.id === c.commenter_id && (
+                          <button
+                            className="action comment-edit-button"
+                            onClick={() => startEditingComment(c)}
+                          >
+                            <Pencil size={14} /> Edit response
+                          </button>
+                        )}
+                      </>
+                    )}
                   </div>
                 </motion.li>
               ))}

@@ -32,6 +32,7 @@ export default function App() {
           <Route path="/login" element={<Page><Login /></Page>} />
           <Route path="/register" element={<Page><Register /></Page>} />
           <Route path="/write" element={<ProtectedRoute><Page><Write /></Page></ProtectedRoute>} />
+          <Route path="/blog/:id/edit" element={<ProtectedRoute><Page><Write /></Page></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute><Page><Settings /></Page></ProtectedRoute>} />
           <Route path="*" element={<Page><NotFound /></Page>} />
       </Routes>

@@ -84,6 +84,11 @@ class BlogCreate(BlogBase):
     pass
 
 
+class BlogUpdate(SQLModel):
+    title: str = Field(min_length=1, max_length=255)
+    content: str = Field(min_length=1)
+
+
 class BlogDetailResponse(BlogBase):
     id: int
     author_id: int
@@ -102,6 +107,10 @@ class BlogPageResponse(SQLModel):
 # Comment Schemas
 class CommentCreate(CommentBase):
     pass
+
+
+class CommentUpdate(SQLModel):
+    text: str = Field(min_length=1)
 
 
 class CommentResponse(CommentBase):
