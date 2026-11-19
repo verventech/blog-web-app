@@ -13,6 +13,16 @@ pipeline {
     }
 
     stages {
+        stage('Secret Scan') {
+            steps {
+                sh """
+                    docker run --rm -v "\${WORKSPACE}":/repo \
+                      ghcr.io/gitleaks/gitleaks:v8.30.1 \
+                      dir --redact --no-banner /repo
+                """
+            }
+        }
+
         stage('Unit Tests & Linting') {
             steps {
                 sh """
@@ -42,7 +52,7 @@ pipeline {
                               --health-cmd "pg_isready -U postgres -d test_db" \
                               --health-interval 2s --health-timeout 2s --health-retries 30 \
                               -e POSTGRES_USER=postgres \
-                              -e POSTGRES_PASSWORD=testpass \
+                              -e POSTGRES_HOST_AUTH_METHOD=trust \
                               -e POSTGRES_DB=test_db \
                               postgres:16-alpine
                         """
@@ -56,9 +66,7 @@ pipeline {
                             docker run --rm --network ${netName} \
                               -v "\${WORKSPACE}/backend":/app -w /app \
                               -e PYTHONPATH=/app \
-                              -e DATABASE_URL=postgresql://postgres:testpass@${dbName}:5432/test_db \
-                              -e SECRET_KEY=ci-only-test-secret \
-                              -e ALGORITHM=HS256 \
+                              -e DATABASE_URL=postgresql://postgres@${dbName}:5432/test_db \
                               python:3.11-slim bash -c '
                                 pip install -q -r requirements-test.txt &&
                                 pytest tests/integration -v --junitxml=integration-results.xml
@@ -146,8 +154,17 @@ EOF
         stage('Staging Smoke & Health Test') {
             steps {
                 sh """
-                    curl --fail --retry 5 --retry-delay 2 \
+                    # 1. Verify React frontend is served by Nginx (200 OK)
+                    curl --fail --silent --show-error --retry 5 --retry-delay 2 \
+                      http://${STAGING_IP}:8081/ > /dev/null
+
+                    # 2. Verify FastAPI backend is alive
+                    curl --fail --silent --show-error --retry 5 --retry-delay 2 \
                       http://${STAGING_IP}:8081/api/health
+
+                    # 3. Verify FastAPI can query PostgreSQL
+                    curl --fail --silent --show-error \
+                      "http://${STAGING_IP}:8081/api/blogs?limit=1" > /dev/null
                 """
             }
         }

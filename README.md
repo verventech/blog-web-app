@@ -46,9 +46,11 @@ edits by anyone other than the original author.
 
 ### CI checks
 
-The Jenkins pipeline runs backend lint and unit tests, then API integration
-tests against an isolated PostgreSQL database. It builds separate backend and
-frontend images and checks `/api/health` on staging before the approval gate.
+The Jenkins pipeline scans checked-out files for secrets with Gitleaks, runs
+backend lint and unit tests, then API integration tests against an isolated
+PostgreSQL database. It builds separate backend and frontend images and checks
+`/api/health` on staging before the approval gate. The secret scan redacts
+detected values in logs and fails the build if it finds a match.
 Configure Jenkins credentials `docker-hub-pat`, `vm-ssh-key`,
 `blog-app-db-password`, and `blog-app-secret-key` before enabling deployments.
 
