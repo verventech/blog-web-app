@@ -118,7 +118,7 @@ pipeline {
                     sh '''
                         umask 077
                         cat > .env <<EOF
-POSTGRES_USER=blog_app
+POSTGRES_USER=postgres
 POSTGRES_PASSWORD=$DB_PASS
 POSTGRES_DB=blog_app
 POSTGRES_HOST=db
@@ -136,8 +136,9 @@ EOF
         stage('Deploy to Staging') {
             steps {
                 sshagent([SSH_CREDS_ID]) {
-                    sh "ssh -o StrictHostKeyChecking=no ${VM_USER}@${STAGING_IP} 'mkdir -p ~/${APP_NAME}'"
-                    sh "scp -r -o StrictHostKeyChecking=no docker-compose.yml .env db ${VM_USER}@${STAGING_IP}:~/${APP_NAME}/"
+                    // Remove any broken gateway directory auto-created by Docker before copying fresh files
+                    sh "ssh -o StrictHostKeyChecking=no ${VM_USER}@${STAGING_IP} 'rm -rf ~/${APP_NAME}/gateway && mkdir -p ~/${APP_NAME}'"
+                    sh "scp -r -o StrictHostKeyChecking=no docker-compose.yml .env db gateway ${VM_USER}@${STAGING_IP}:~/${APP_NAME}/"
                     sh """
                         ssh -o StrictHostKeyChecking=no ${VM_USER}@${STAGING_IP} '
                             cd ~/${APP_NAME}
@@ -178,8 +179,8 @@ EOF
         stage('Deploy to Production') {
             steps {
                 sshagent([SSH_CREDS_ID]) {
-                    sh "ssh -o StrictHostKeyChecking=no ${VM_USER}@${PROD_IP} 'mkdir -p ~/${APP_NAME}'"
-                    sh "scp -r -o StrictHostKeyChecking=no docker-compose.yml .env db ${VM_USER}@${PROD_IP}:~/${APP_NAME}/"
+                    sh "ssh -o StrictHostKeyChecking=no ${VM_USER}@${PROD_IP} 'rm -rf ~/${APP_NAME}/gateway && mkdir -p ~/${APP_NAME}'"
+                    sh "scp -r -o StrictHostKeyChecking=no docker-compose.yml .env db gateway ${VM_USER}@${PROD_IP}:~/${APP_NAME}/"
                     sh """
                         ssh -o StrictHostKeyChecking=no ${VM_USER}@${PROD_IP} '
                             cd ~/${APP_NAME}
