@@ -136,8 +136,12 @@ EOF
         stage('Deploy to Staging') {
             steps {
                 sshagent([SSH_CREDS_ID]) {
-                    // Remove any broken gateway directory auto-created by Docker before copying fresh files
-                    sh "ssh -o StrictHostKeyChecking=no ${VM_USER}@${STAGING_IP} 'rm -rf ~/${APP_NAME}/gateway && mkdir -p ~/${APP_NAME}'"
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${VM_USER}@${STAGING_IP} '
+                            mkdir -p ~/${APP_NAME} &&
+                            docker run --rm -v ~/${APP_NAME}:/clean alpine rm -rf /clean/gateway
+                        '
+                    """
                     sh "scp -r -o StrictHostKeyChecking=no docker-compose.yml .env db gateway ${VM_USER}@${STAGING_IP}:~/${APP_NAME}/"
                     sh """
                         ssh -o StrictHostKeyChecking=no ${VM_USER}@${STAGING_IP} '
@@ -179,7 +183,12 @@ EOF
         stage('Deploy to Production') {
             steps {
                 sshagent([SSH_CREDS_ID]) {
-                    sh "ssh -o StrictHostKeyChecking=no ${VM_USER}@${PROD_IP} 'rm -rf ~/${APP_NAME}/gateway && mkdir -p ~/${APP_NAME}'"
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${VM_USER}@${PROD_IP} '
+                            mkdir -p ~/${APP_NAME} &&
+                            docker run --rm -v ~/${APP_NAME}:/clean alpine rm -rf /clean/gateway
+                        '
+                    """
                     sh "scp -r -o StrictHostKeyChecking=no docker-compose.yml .env db gateway ${VM_USER}@${PROD_IP}:~/${APP_NAME}/"
                     sh """
                         ssh -o StrictHostKeyChecking=no ${VM_USER}@${PROD_IP} '
