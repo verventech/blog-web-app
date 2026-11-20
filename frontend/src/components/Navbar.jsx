@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogOut, PenSquare, Settings, User as UserIcon } from "lucide-react";
+import { LogOut, PenSquare, Search, Settings, User as UserIcon } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Avatar from "./Avatar";
 
@@ -58,6 +58,9 @@ export default function Navbar() {
         </nav>
 
         <div className="nav-actions">
+          <Link to="/users" className="btn btn-ghost btn-sm" aria-label="Find people">
+            <Search size={16} /> <span className="hide-sm">Find people</span>
+          </Link>
           {user ? (
             <>
               <Link to="/write" className="btn btn-primary btn-sm">

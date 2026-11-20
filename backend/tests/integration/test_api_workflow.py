@@ -49,6 +49,11 @@ def test_user_can_register_and_login(client):
     )
     assert registration.status_code == 201
 
+    search = client.get("/users/search?name=sar")
+    assert search.status_code == 200
+    assert search.json()[0]["id"] == registration.json()["id"]
+    assert "email" not in search.json()[0]
+
     login = client.post(
         "/login",
         data={"username": "sara1", "password": "mypassword123"},

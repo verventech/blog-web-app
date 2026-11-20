@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Write from "./pages/Write";
 import Profile from "./pages/Profile";
+import UserSearch from "./pages/UserSearch";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -28,6 +29,7 @@ export default function App() {
       <Routes location={location}>
           <Route path="/" element={<Page><Home /></Page>} />
           <Route path="/blog/:id" element={<Page><BlogDetail /></Page>} />
+          <Route path="/users" element={<Page><UserSearch /></Page>} />
           <Route path="/user/:id" element={<Page><Profile /></Page>} />
           <Route path="/login" element={<Page><Login /></Page>} />
           <Route path="/register" element={<Page><Register /></Page>} />

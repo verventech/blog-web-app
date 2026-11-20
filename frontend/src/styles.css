@@ -80,6 +80,7 @@ input, textarea { font: inherit; color: inherit; }
 .nav-link:hover { color: var(--text); background: var(--fill); }
 .nav-link.active { color: var(--accent); background: var(--accent-soft); }
 .nav-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.nav-actions > a[aria-label="Find people"] { flex-shrink: 0; }
 .avatar-btn { border-radius: 50%; display: block; }
 .menu-wrap { position: relative; }
 .menu {
@@ -177,6 +178,13 @@ input, textarea { font: inherit; color: inherit; }
 .empty { padding: 48px 0; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .empty h3 { font-family: var(--serif); font-size: 1.4rem; font-weight: 600; }
 .empty p { color: var(--muted); margin-bottom: 8px; }
+.user-search-form { display: flex; align-items: center; gap: 10px; margin: 20px 0; }
+.user-search-form .search { padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.user-search-results { display: grid; gap: 10px; list-style: none; }
+.user-search-result { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); }
+.user-search-result:hover { border-color: var(--line-strong); background: var(--accent-soft); }
+.user-search-info { display: flex; min-width: 0; flex-direction: column; }
+.user-search-bio { overflow: hidden; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; }
 .loader-wrap { min-height: 40vh; display: grid; place-content: center; color: var(--muted); }
 .loader { display: none; }
 

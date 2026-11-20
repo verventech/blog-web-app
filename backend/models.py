@@ -70,6 +70,13 @@ class UserGet(UserBase):
     followers_count: int = 0
 
 
+class UserSearchResult(SQLModel):
+    id: int
+    name: str
+    username: str
+    bio: Optional[str] = None
+
+
 class UserPut(UserBase):
     password: Optional[str] = None
 

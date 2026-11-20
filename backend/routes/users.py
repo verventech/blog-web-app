@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlmodel import Session, func, select
 
 from db import get_session
-from models import User, UserCreate, UserFollow, UserGet, UserPut
+from models import User, UserCreate, UserFollow, UserGet, UserPut, UserSearchResult
 from security import get_current_user, hash_password
 
 router = APIRouter(tags=["Users"])
@@ -20,6 +20,33 @@ def as_user_get(user: User, session: Session) -> UserGet:
         bio=user.bio,
         followers_count=followers_count,
     )
+
+
+@router.get("/users/search", response_model=list[UserSearchResult])
+def searchUsers(
+    name: str = Query(min_length=1, max_length=100),
+    limit: int = Query(default=20, ge=1, le=50),
+    session: Session = Depends(get_session),
+):
+    search_name = name.strip()
+    if not search_name:
+        raise HTTPException(status_code=422, detail="Name cannot be empty")
+
+    users = session.exec(
+        select(User)
+        .where(User.name.ilike(f"%{search_name}%"))
+        .order_by(func.lower(User.name), User.id)
+        .limit(limit)
+    ).all()
+    return [
+        UserSearchResult(
+            id=user.id,
+            name=user.name,
+            username=user.username,
+            bio=user.bio,
+        )
+        for user in users
+    ]
 
 
 @router.post("/user", response_model=UserGet, status_code=status.HTTP_201_CREATED)

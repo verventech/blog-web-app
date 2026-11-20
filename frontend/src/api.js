@@ -70,6 +70,10 @@ export const api = {
   register: (user) => request("/user", { method: "POST", body: user }),
   me: () => request("/user/me", { auth: true }),
   updateMe: (user) => request("/user/me", { method: "PUT", body: user, auth: true }),
+  searchUsers: (name, limit = 20) => {
+    const params = new URLSearchParams({ name, limit: String(limit) });
+    return request(`/users/search?${params.toString()}`);
+  },
 
   getUser(id) {
     if (!userCache.has(id)) {
