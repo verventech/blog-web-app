@@ -44,6 +44,13 @@ their own responses inline. The API exposes authenticated `PATCH /api/blog/{id}`
 and `PATCH /api/blog/{blog_id}/comment/{comment_id}` endpoints. Both reject
 edits by anyone other than the original author.
 
+### Finding people
+
+Use the **Find people** link to search for users by a case-insensitive partial
+match on name. `GET /api/users/search?name=...` is public and returns at most 20
+results by default (up to 50 with `limit`), including each user's ID, name,
+username, and bio.
+
 ### CI checks
 
 The Jenkins pipeline scans checked-out files for secrets with Gitleaks, runs
