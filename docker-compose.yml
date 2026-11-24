@@ -23,6 +23,8 @@ services:
 
   backend:
     image: ${DOCKER_USER:-verventech}/blog-web-app-backend:v${TAG}
+    deploy:
+      replicas: 3
     restart: unless-stopped
     env_file:
       - .env
@@ -34,6 +36,8 @@ services:
 
   frontend:
     image: ${DOCKER_USER:-verventech}/blog-web-app-frontend:v${TAG}
+    deploy:
+      replicas: 3
     restart: always
     networks:
       - blog_net
